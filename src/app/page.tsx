@@ -1,101 +1,137 @@
-import Image from "next/image";
+ 
+'use client';
+
+import { useState, useRef } from 'react';
+
+declare global {
+  interface Window {
+    webkitAudioContext: typeof AudioContext;
+  }
+}
+import AudioPlayer from '../components/AudioPlayer';
+import WaveformEditor from '../components/WaveformEditor';
+import ControlPanel from '../components/ControlPanel';
+import Equalizer from '../components/Equalizer';
+import VocalExtractor from '../components/VocalExtractor';
 
 export default function Home() {
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  
+  // Refs for audio context and processors
+  const audioContextRef = useRef<AudioContext | null>(null);
+  
+  // Function to handle file uploads
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    setAudioFile(file);
+    
+    // Create AudioContext if it doesn't exist
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    // Read file and decode audio
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        const decodedBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
+        setAudioBuffer(decodedBuffer);
+      } catch (error) {
+        console.error('Error decoding audio file:', error);
+        alert('Could not process audio file. Please try another one.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  
+  // Function to reset the application
+  const handleReset = () => {
+    setAudioFile(null);
+    setAudioBuffer(null);
+    // Reset other state as needed
+  };
+  
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    <main className="min-h-screen p-4 md:p-8">
+      <div className="max-w-6xl mx-auto">
+        <header className="mb-8 text-center">
+          <h1 className="text-3xl font-bold mb-2">WebAudio Studio</h1>
+          <p className="text-gray-600">Edit, trim, extract vocals, and equalize audio files in your browser</p>
+        </header>
+        
+        {!audioFile ? (
+          <div className="bg-white p-8 rounded-lg shadow-lg text-center">
+            <h2 className="text-xl font-semibold mb-4">Upload an Audio File to Begin</h2>
+            <p className="mb-6 text-gray-600">Supported formats: MP3, WAV (Max size: 10MB)</p>
+            <label className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md cursor-pointer transition">
+              Choose File
+              <input 
+                type="file" 
+                accept="audio/mp3,audio/wav" 
+                onChange={handleFileUpload} 
+                className="hidden" 
+              />
+            </label>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <div className="bg-white p-4 rounded-lg shadow-lg">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">{audioFile.name}</h2>
+                <button 
+                  onClick={handleReset}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  Start Over
+                </button>
+              </div>
+              
+              {audioBuffer && (
+                <>
+                  <WaveformEditor 
+                    audioBuffer={audioBuffer} 
+                    audioContext={audioContextRef.current!} 
+                  />
+                  <AudioPlayer 
+                    audioBuffer={audioBuffer} 
+                    audioContext={audioContextRef.current!} 
+                  />
+                </>
+              )}
+              
+              <ControlPanel 
+                isProcessing={isProcessing}
+                setIsProcessing={setIsProcessing}
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white p-4 rounded-lg shadow-lg">
+                <h3 className="text-lg font-semibold mb-4">Vocal Extractor</h3>
+                <VocalExtractor 
+                  audioFile={audioFile}
+                  isProcessing={isProcessing}
+                  setIsProcessing={setIsProcessing}
+                />
+              </div>
+              
+              <div className="bg-white p-4 rounded-lg shadow-lg">
+                <h3 className="text-lg font-semibold mb-4">8-Band Equalizer</h3>
+                <Equalizer 
+                  audioContext={audioContextRef.current}
+                  audioBuffer={audioBuffer}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </main>
   );
 }
